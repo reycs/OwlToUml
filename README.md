@@ -4,5 +4,5 @@ Converter from OWL (OWL-API compatible) to UML (Eclipse UML2). Supports export t
 
 # Example Usage
 ```
-java -jar OwlToUml-1.0.0 --ontology http://www.w3.org/ns/prov-o --prefix prov
+java -jar OwlToUml-1.0.0.jar --ontology http://www.w3.org/ns/prov-o --prefix prov
 ```
