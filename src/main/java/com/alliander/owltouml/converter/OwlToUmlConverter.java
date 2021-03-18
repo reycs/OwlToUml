@@ -8,6 +8,7 @@ import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.formats.PrefixDocumentFormat;
 import org.semanticweb.owlapi.model.*;
 
+import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +46,7 @@ public class OwlToUmlConverter {
     }
 
     public Model convertToUml() {
+        System.out.println("Converting ontology.");
         this.umlModel = this.umlFactory.createModel();
         this.rootPackage = this.umlModel.createNestedPackage(this.prefix + "-ontology");
         this.processPrefixes();
@@ -52,6 +54,7 @@ public class OwlToUmlConverter {
         this.processDataProperties();
         this.processObjectProperties();
         this.processSubClassOf();
+        System.out.println("Finished converting.");
         return this.umlModel;
     }
 

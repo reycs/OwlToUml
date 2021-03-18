@@ -15,6 +15,9 @@ import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.File;
+import java.sql.SQLOutput;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class EnterpriseArchitectNativeExporter {
@@ -40,6 +43,7 @@ public class EnterpriseArchitectNativeExporter {
     }
 
     public void export(String name) throws ParserConfigurationException, TransformerException {
+        System.out.println("Start exporting.");
         DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
         elementList = new HashMap<String, Element>();
         tree = new HashMap<String, List<String>>();
@@ -56,6 +60,7 @@ public class EnterpriseArchitectNativeExporter {
         tr.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
         tr.setOutputProperty(OutputKeys.INDENT, "yes");
         tr.transform(new DOMSource(dom), new StreamResult(new File(name + ".xml")));
+        System.out.println("Finished exporting.");
     }
 
     private void processModel() {
@@ -96,12 +101,12 @@ public class EnterpriseArchitectNativeExporter {
                     // inheritance
                     cls.getSuperClasses().forEach(superCls -> {
                         Element parent = this.elementList.get(superCls.getName());
-                        this.tConnector.appendChild(getTConnectorRow("Generalization", getAttributeValue(this.elementList.get(cls.getName()), "ea_guid"), getAttributeValue(parent, "ea_guid"), ""));
+                        this.tConnector.appendChild(getTConnectorRow("Generalization", getAttributeValue(this.elementList.get(cls.getName()), "ea_guid"), getAttributeValue(parent, "ea_guid"), "", getAttributeValue(this.elementList.get(cls.getName()), "Object_ID"), getAttributeValue(parent, "Object_ID")));
                     });
                 }
                 if (e instanceof Association) {
                     Association assoc = (Association) e;
-                    this.tConnector.appendChild(getTConnectorRow("Association", getAttributeValue(this.elementList.get(assoc.getMemberEnds().get(1).getType().getName()), "ea_guid"), getAttributeValue(this.elementList.get(assoc.getMemberEnds().get(0).getType().getName()), "ea_guid"), assoc.getMemberEnds().get(0).getName()));
+                    this.tConnector.appendChild(getTConnectorRow("Association", getAttributeValue(this.elementList.get(assoc.getMemberEnds().get(1).getType().getName()), "ea_guid"), getAttributeValue(this.elementList.get(assoc.getMemberEnds().get(0).getType().getName()), "ea_guid"), assoc.getMemberEnds().get(0).getName(), getAttributeValue(this.elementList.get(assoc.getMemberEnds().get(1).getType().getName()), "Object_ID"), getAttributeValue(this.elementList.get(assoc.getMemberEnds().get(0).getType().getName()), "Object_ID")));
                 }
             });
         });
@@ -117,16 +122,16 @@ public class EnterpriseArchitectNativeExporter {
         // root package
         this.currentPackage = getTPackageRow(name, guid, "0", false, "");
         this.tPackage.appendChild(this.currentPackage);
-        this.tObject.appendChild(getTPackageObject(name, guid, getAttributeValue(this.currentPackage, "Package_ID"), true));
+        this.tObject.appendChild(getTPackageObject(name, guid, getAttributeValue(this.currentPackage, "Package_ID"), true, "", getAttributeValue(this.currentPackage, "Package_ID")));
 
         this.elementList.put(this.inputPath, this.currentPackage);
     }
 
     private void createPackage(String name, String parentPath) {
         String guid = getGuid();
-        this.currentPackage = getTPackageRow(name, guid, "0", true, getAttributeValue(this.elementList.get(parentPath), "ea_guid"));
+        this.currentPackage = getTPackageRow(name, guid, getAttributeValue(this.elementList.get(parentPath), "Package_ID"), true, getAttributeValue(this.elementList.get(parentPath), "ea_guid"));
         this.tPackage.appendChild(this.currentPackage);
-        this.tObject.appendChild(getTPackageObject(name, guid, getAttributeValue(this.currentPackage, "Package_ID"), true));
+        this.tObject.appendChild(getTPackageObject(name, guid, getAttributeValue(this.elementList.get(parentPath), "Package_ID"), false, getAttributeValue(this.elementList.get(parentPath), "ea_guid"), getAttributeValue(this.currentPackage, "Package_ID")));
         this.elementList.put(this.inputPath + name, this.currentPackage);
     }
 
@@ -171,10 +176,37 @@ public class EnterpriseArchitectNativeExporter {
         return row;
     }
 
-    private Element getTConnectorRow(String type, String startGuid, String endGuid, String destRole) {
+    private Element getTConnectorRow(String type, String startGuid, String endGuid, String destRole, String startId, String endId) {
         Element row = this.dom.createElement("Row");
         row.appendChild(getColumn("Connector_ID", getId()));
         row.appendChild(getColumn("Connector_Type", type));
+        row.appendChild(getColumn("SourceIsAggregate", "0"));
+        row.appendChild(getColumn("SourceIsOrdered", "0"));
+        row.appendChild(getColumn("DestIsAggregate", "0"));
+        row.appendChild(getColumn("DestIsOrdered", "0"));
+        row.appendChild(getColumn("Start_Object_ID", startId));
+        row.appendChild(getColumn("End_Object_ID", endId));
+        row.appendChild(getColumn("Start_Edge", "0"));
+        row.appendChild(getColumn("End_Edge", "0"));
+        row.appendChild(getColumn("PtStartX", "0"));
+        row.appendChild(getColumn("PtStartY", "0"));
+        row.appendChild(getColumn("PtEndX", "0"));
+        row.appendChild(getColumn("PtEndY", "0"));
+        row.appendChild(getColumn("SeqNo", "0"));
+        row.appendChild(getColumn("HeadStyle", "0"));
+        row.appendChild(getColumn("LineStyle", "0"));
+        row.appendChild(getColumn("RouteStyle", "0"));
+        row.appendChild(getColumn("IsBold", "0"));
+        row.appendChild(getColumn("LineColor", "0"));
+        row.appendChild(getColumn("DiagramID", "0"));
+        row.appendChild(getColumn("SourceIsNavigable", "FALSE"));
+        row.appendChild(getColumn("DestIsNavigable", "FALSE"));
+        row.appendChild(getColumn("IsRoot", "FALSE"));
+        row.appendChild(getColumn("IsLeaf", "FALSE"));
+        row.appendChild(getColumn("IsSpec", "FALSE"));
+        row.appendChild(getColumn("IsSignal", "FALSE"));
+        row.appendChild(getColumn("IsStimulus", "FALSE"));
+        row.appendChild(getColumn("Target2", "0"));
         if (!destRole.isEmpty()) {
             row.appendChild(getColumn("DestRole", destRole));
             row.appendChild(getColumn("Direction", "Source -> Destination"));
@@ -188,32 +220,58 @@ public class EnterpriseArchitectNativeExporter {
 
     private Element getTAttributeRow(String name, String guid, String parentGuid, String note, String type) {
         Element row = this.dom.createElement("Row");
-        row.appendChild(getColumn("Name", name));
-        row.appendChild(getColumn("ea_guid", guid));
         row.appendChild(getColumn("Object_ID", getId()));
+        row.appendChild(getColumn("Name", name));
         row.appendChild(getColumn("Scope", "Public"));
-        row.appendChild(getColumn("Type", type));
+        row.appendChild(getColumn("IsStatic", "0"));
+        row.appendChild(getColumn("IsCollection", "0"));
+        row.appendChild(getColumn("IsOrdered", "0"));
+        row.appendChild(getColumn("AllowDuplicates", "0"));
         row.appendChild(getColumn("LowerBound", "0"));
         row.appendChild(getColumn("UpperBound", "1"));
         if (!note.isEmpty())
             row.appendChild(getColumn("Notes", note));
+        row.appendChild(getColumn("Pos", "0"));
+        row.appendChild(getColumn("Length", "0"));
+        row.appendChild(getColumn("Precision", "0"));
+        row.appendChild(getColumn("Scale", "0"));
+        row.appendChild(getColumn("Const", "0"));
         Element extension = this.dom.createElement("Extension");
+        row.appendChild(getColumn("Type", type));
+        row.appendChild(getColumn("ea_guid", guid));
         extension.setAttribute("Object_ID", parentGuid);
         row.appendChild(extension);
         return row;
     }
 
     private Element getTPackageRow(String name, String guid, String parentId, boolean hasParent, String parentGuid) {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
+
         Element row = this.dom.createElement("Row");
-        row.appendChild(getColumn("Name", name));
-        row.appendChild(getColumn("ea_guid", guid));
         row.appendChild(getColumn("Package_ID", getId()));
+        row.appendChild(getColumn("Name", name));
         row.appendChild(getColumn("Parent_ID", parentId));
-        if (hasParent) {
-            Element extension = this.dom.createElement("Extension");
+
+        row.appendChild(getColumn("CreatedDate", dtf.format(now)));
+        row.appendChild(getColumn("ModifiedDate", dtf.format(now)));
+
+        row.appendChild(getColumn("ea_guid", guid));
+
+        row.appendChild(getColumn("IsControlled", "FALSE"));
+        row.appendChild(getColumn("LastLoadDate", dtf.format(now)));
+        row.appendChild(getColumn("LastSaveDate", dtf.format(now)));
+        row.appendChild(getColumn("Protected", "FALSE"));
+        row.appendChild(getColumn("UseDTD", "FALSE"));
+        row.appendChild(getColumn("LogXML", "FALSE"));
+        row.appendChild(getColumn("TPos", "0"));
+        row.appendChild(getColumn("BatchSave", "0"));
+        row.appendChild(getColumn("BatchLoad", "0"));
+
+        Element extension = this.dom.createElement("Extension");
+        if (hasParent)
             extension.setAttribute("Parent_ID", parentGuid);
-            row.appendChild(extension);
-        }
+        row.appendChild(extension);
         return row;
     }
 
@@ -227,20 +285,52 @@ public class EnterpriseArchitectNativeExporter {
         return classObject;
     }
 
-    private Element getTPackageObject(String name, String guid, String packageId, boolean isRoot) {
+    private Element getTPackageObject(String name, String guid, String packageId, boolean isRoot, String parentGuid, String pdata1) {
         Element packageObject = getTObjectRow(name, guid, "Package");
-        if (!isRoot)
-            packageObject.appendChild(getColumn("IsRoot", "FALSE"));
         packageObject.appendChild(getColumn("Package_ID", packageId));
+        packageObject.appendChild(getColumn("PDATA1", pdata1));
+        packageObject.appendChild(getColumn("Diagram_ID", "0"));
+        packageObject.appendChild(getColumn("Author", "OwlToUml"));
+        packageObject.appendChild(getColumn("Version", "1.0"));
+        packageObject.appendChild(getColumn("Complexity", "1"));
+        packageObject.appendChild(getColumn("Status", "proposed"));
+        packageObject.appendChild(getColumn("Abstract", "0"));
+        packageObject.appendChild(getColumn("GenType", "Java"));
+        packageObject.appendChild(getColumn("Phase", "1.0"));
+        packageObject.appendChild(getColumn("Scope", "Public"));
+        Element extension = this.dom.createElement("Extension");
+        if (!isRoot)
+            extension.setAttribute("Package_ID", parentGuid);
+        extension.setAttribute("PDATA1", guid);
+        packageObject.appendChild(extension);
         return packageObject;
     }
 
     private Element getTObjectRow(String name, String guid, String type) {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime now = LocalDateTime.now();
         Element row = this.dom.createElement("Row");
         row.appendChild(getColumn("name", name));
         row.appendChild(getColumn("ea_guid", guid));
         row.appendChild(getColumn("Object_ID", getId()));
         row.appendChild(getColumn("Object_type", type));
+        row.appendChild(getColumn("Classifier", "0"));
+        row.appendChild(getColumn("ParentID", "0"));
+        row.appendChild(getColumn("IsRoot", "FALSE"));
+        row.appendChild(getColumn("IsLeaf", "FALSE"));
+        row.appendChild(getColumn("IsSpec", "FALSE"));
+        row.appendChild(getColumn("IsActive", "FALSE"));
+        row.appendChild(getColumn("Tagged", "0"));
+        row.appendChild(getColumn("TPos", "0"));
+        row.appendChild(getColumn("Effort", "0"));
+        row.appendChild(getColumn("Backcolor", "-1"));
+        row.appendChild(getColumn("BorderStyle", "0"));
+        row.appendChild(getColumn("BorderWidth", "-1"));
+        row.appendChild(getColumn("Fontcolor", "-1"));
+        row.appendChild(getColumn("Bordercolor", "-1"));
+        row.appendChild(getColumn("CreatedDate", dtf.format(now)));
+        row.appendChild(getColumn("ModifiedDate", dtf.format(now)));
+        row.appendChild(getColumn("NType", "0"));
         return row;
     }
 
